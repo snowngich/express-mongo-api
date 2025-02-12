@@ -1,6 +1,6 @@
 # Express MongoDB API
 
-A robust RESTful API built with Express.js and MongoDB, featuring user authentication, input validation, and security best practices.
+A comprehensive RESTful API built with Express.js and MongoDB, implementing industry-standard authentication, validation, and security practices. This API provides a robust foundation for building secure web applications with user management capabilities.
 
 ## 🏗 System Architecture
 
@@ -26,6 +26,36 @@ graph TB
     end
 ```
 
+#### Detailed Component Explanation
+1. **Client Layer**
+   - External applications/browsers making HTTP requests
+   - Communicates using JSON format
+   - Handles JWT token storage and transmission
+
+2. **Express.js Server**
+   - Core application server handling requests
+   - Implements middleware chain for request processing
+   - Manages routing and error handling
+   - Provides API endpoint implementations
+
+3. **Authentication Layer**
+   - JWT-based authentication system
+   - Token verification and validation
+   - Session management
+   - Security middleware implementation
+
+4. **Business Logic Layer**
+   - Controllers for handling business logic
+   - Services for reusable operations
+   - Input validation and sanitization
+   - Error handling and response formatting
+
+5. **Data Access Layer**
+   - MongoDB interaction through Mongoose ODM
+   - Schema definitions and validation
+   - Data persistence and retrieval
+   - Index management and query optimization
+
 ### Authentication Flow
 ```mermaid
 sequenceDiagram
@@ -46,6 +76,28 @@ sequenceDiagram
     Ctrl-->>C: Send Response
 ```
 
+#### Detailed Authentication Process
+1. **Client Request**
+   - Client sends request with JWT in Authorization header
+   - Token format: "Bearer <jwt_token>"
+   - Includes necessary request payload
+
+2. **Token Validation**
+   - Middleware extracts token from header
+   - Verifies token signature using JWT_SECRET
+   - Checks token expiration
+   - Validates token payload
+
+3. **User Context**
+   - Decoded user information attached to request
+   - User permissions verified
+   - Request forwarded to appropriate handler
+
+4. **Response Handling**
+   - Authenticated responses include user context
+   - Error responses for invalid tokens
+   - Proper HTTP status codes
+
 ### Request-Response Flow
 ```mermaid
 flowchart LR
@@ -59,78 +111,194 @@ flowchart LR
     H --> I[Response]
 ```
 
+#### Detailed Request Pipeline
+1. **Initial Request Processing**
+   ```javascript
+   // Middleware Stack Implementation
+   app.use(express.json()); // Parse JSON bodies
+   app.use(cors());         // Handle CORS
+   app.use(helmet());       // Security headers
+   app.use(morgan("dev")); // Request logging
+   ```
+
+2. **Security Layer**
+   ```javascript
+   // CORS Configuration
+   app.use(cors({
+     origin: process.env.ALLOWED_ORIGINS,
+     methods: ['GET', 'POST', 'PUT', 'DELETE'],
+     allowedHeaders: ['Content-Type', 'Authorization']
+   }));
+
+   // Helmet Security Headers
+   app.use(helmet({
+     contentSecurityPolicy: true,
+     xssFilter: true,
+     noSniff: true,
+     hidePoweredBy: true
+   }));
+   ```
+
 ## 🔧 Project Structure
 
+### Detailed Directory Explanation
 ```
 express-mongo-api/
 │
-├── src/
-│   ├── config/
-│   │   └── db.js           # Database configuration
+├── src/                    # Source code directory
+│   ├── config/            # Configuration files
+│   │   ├── db.js         # Database connection setup
+│   │   └── swagger.js    # API documentation config
 │   │
-│   ├── controllers/
-│   │   └── userController.js # User-related operations
+│   ├── controllers/       # Request handlers
+│   │   └── userController.js  # User operations logic
 │   │
-│   ├── middleware/
-│   │   └── authMiddleware.js # JWT authentication
+│   ├── middleware/        # Custom middleware
+│   │   ├── authMiddleware.js  # JWT verification
+│   │   └── errorMiddleware.js # Error handling
 │   │
-│   ├── models/
-│   │   └── User.js         # User schema definition
+│   ├── models/           # Database schemas
+│   │   └── User.js      # User model definition
 │   │
-│   ├── routes/
-│   │   └── userRoutes.js   # API endpoints
+│   ├── routes/           # API routes
+│   │   └── userRoutes.js # User endpoints
 │   │
-│   ├── services/
-│   │   └── authService.js  # Authentication utilities
+│   ├── services/         # Business logic
+│   │   └── authService.js # Authentication utilities
 │   │
-│   └── app.js             # Express application setup
+│   └── app.js           # Express application setup
 │
-├── .env                   # Environment variables
-├── package.json          # Project dependencies
-└── server.js            # Application entry point
+├── .env                  # Environment configuration
+├── .gitignore           # Git ignore rules
+├── package.json         # Project metadata
+└── server.js           # Application entry point
 ```
 
-## 🔍 Code Breakdown
+## 🔍 Detailed Code Breakdown
 
 ### 1. Database Configuration (db.js)
 ```javascript
-// Establishes MongoDB connection using mongoose
+const mongoose = require("mongoose");
+require("dotenv").config();
+
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI);
+    // MongoDB connection with options
+    await mongoose.connect(process.env.MONGO_URI, {
+      useNewUrlParser: true,      // Use new URL parser
+      useUnifiedTopology: true,   // Use new Server Discover and Monitoring engine
+    });
     console.log("✅ MongoDB Connected");
   } catch (error) {
-    console.error("❌ MongoDB Connection Error");
-    process.exit(1);
+    console.error("❌ MongoDB Connection Error:", error);
+    process.exit(1);  // Exit process with failure
   }
 };
+
+module.exports = connectDB;
 ```
 
 ### 2. User Model (User.js)
 ```javascript
-// Defines user schema with required fields
+const mongoose = require("mongoose");
+
 const UserSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
-}, { timestamps: true });
+  name: { 
+    type: String, 
+    required: [true, "Name is required"],
+    trim: true,
+    minlength: [2, "Name must be at least 2 characters"]
+  },
+  email: { 
+    type: String, 
+    required: [true, "Email is required"],
+    unique: true,
+    lowercase: true,
+    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, "Please enter a valid email"]
+  },
+  password: { 
+    type: String, 
+    required: [true, "Password is required"],
+    minlength: [6, "Password must be at least 6 characters"]
+  }
+}, { 
+  timestamps: true,  // Adds createdAt and updatedAt fields
+  toJSON: { 
+    transform: function(doc, ret) {
+      delete ret.password;  // Remove password from JSON responses
+      return ret;
+    }
+  }
+});
+
+module.exports = mongoose.model("User", UserSchema);
 ```
 
 ### 3. Authentication Service (authService.js)
 ```javascript
-// Provides authentication utilities
-- hashPassword(): Hashes user passwords using bcrypt
-- comparePasswords(): Verifies password during login
-- generateToken(): Creates JWT for authenticated sessions
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+
+// Password hashing with bcrypt
+const hashPassword = async (password) => {
+  const salt = await bcrypt.genSalt(10);  // Generate salt with 10 rounds
+  return await bcrypt.hash(password, salt);
+};
+
+// Password verification
+const comparePasswords = async (password, hashedPassword) => {
+  return await bcrypt.compare(password, hashedPassword);
+};
+
+// JWT token generation
+const generateToken = (user) => {
+  return jwt.sign(
+    { 
+      id: user._id,
+      email: user.email 
+    },
+    process.env.JWT_SECRET,
+    { 
+      expiresIn: "1h",  // Token expires in 1 hour
+      algorithm: "HS256" // HMAC SHA-256 algorithm
+    }
+  );
+};
+
+module.exports = { hashPassword, comparePasswords, generateToken };
 ```
 
 ### 4. Authentication Middleware (authMiddleware.js)
 ```javascript
-// Protects routes by validating JWT tokens
+const jwt = require("jsonwebtoken");
+
 const authenticateUser = (req, res, next) => {
-  // Extracts and verifies JWT from Authorization header
-  // Attaches user data to request if valid
+  // Extract token from Authorization header
+  const authHeader = req.header("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return res.status(401).json({ 
+      message: "Access Denied", 
+      error: "No token provided" 
+    });
+  }
+
+  try {
+    // Verify token
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // Attach user data to request
+    req.user = decoded;
+    next();
+  } catch (error) {
+    res.status(401).json({ 
+      message: "Invalid Token",
+      error: error.message 
+    });
+  }
 };
+
+module.exports = authenticateUser;
 ```
 
 ### 5. User Controller (userController.js)
@@ -249,12 +417,41 @@ Expected Response:
 
 ## 🔒 Security Features
 
-1. Password Hashing (bcryptjs)
-2. JWT Authentication
-3. HTTP Security Headers (helmet)
-4. CORS Protection
-5. Input Validation
-6. Error Handling Middleware
+1. **Password Security**
+   - Bcrypt hashing with salt rounds
+   - Password strength validation
+   - Secure password reset flow
+
+2. **JWT Implementation**
+   - Token-based authentication
+   - Secure token generation
+   - Expiration handling
+   - Token refresh mechanism
+
+3. **HTTP Security (Helmet)**
+   - XSS protection
+   - Content Security Policy
+   - MIME sniffing prevention
+   - Frame protection
+   - DNS prefetch control
+
+4. **CORS Protection**
+   - Origin validation
+   - Method restrictions
+   - Header allowlist
+   - Credential handling
+
+5. **Input Validation**
+   - Request body validation
+   - Parameter sanitization
+   - Type checking
+   - Size limits
+
+6. **Error Handling**
+   - Centralized error handling
+   - Detailed error logging
+   - Safe error responses
+   - Rate limiting
 
 ## 📝 Environment Variables
 
