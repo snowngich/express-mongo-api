@@ -297,4 +297,4 @@ Features:
 4. Copy the JWT token from the response
 5. Click the "Authorize" button at the top of the page
 6. Enter the token in the format: `Bearer <your_token>`
-7. Now you can test authenticated endpoints like `/api/users/profile` 
+7. Now you can test authenticated endpoints like `/api/users/profile` # express
